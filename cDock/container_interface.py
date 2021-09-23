@@ -1,15 +1,15 @@
 import time
 
-from docker.types import ContainerSpec
+from docker.models.containers import Container
 
 from cDock.container_view import ContainerView
 
 
 class ContainerInterface:
 
-    def __init__(self, container: ContainerSpec):
+    def __init__(self, container: Container):
         self.__container = container
-        self.stats = {}
+        self.stats = None
         self.time_initialized = time.time()
         self.last_checked_at = 0
         self.stats_generator = {}
