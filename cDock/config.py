@@ -20,7 +20,7 @@ class Config:
         tls_verify_path = os.getenv("DOCKER_TLS_VERIFY_PATH")
         config_path = os.getenv("DOCKER_CONFIG_PATH")
         if not socket_url:
-            socket_url = "/var/run/docker.sock"
+            socket_url = "unix://var/run/docker.sock"
         return Config(socket_url, cert_path, tls_verify_path, config_path)
 
 
