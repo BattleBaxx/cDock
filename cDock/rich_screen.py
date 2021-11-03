@@ -75,6 +75,7 @@ class RichScreen:
                     layout['details_1'].update("End Point: primary\nURL: /var/run/docker.sock")
                     layout['details_2'].update("Test")
                     layout['single_container'].update(self.generate_single_table())
+                    # layout['single_container'].update("test")
                     layout["container_list"].update(self.generate_table(container_details))
                     # console.print(layout)
                     live.update(layout)
@@ -89,22 +90,22 @@ class RichScreen:
 
         for details_dict in container_details:
             table.add_row(str(details_dict['id']), str(details_dict['stack']), str(details_dict['image']),
-                          str(details_dict['created']), str(details_dict['updated']), style="white")
+                          str(details_dict['created']), str(details_dict['updated']))
         return table
 
     def generate_single_table(self):
         table = Table(box=box.SIMPLE, width=console.size[0])
         table.add_column("")
-        test = [('long_label', 423), ('sl', 124), ('line3', 531),
+        test = [('long_label', 423), ('sl', 1234), ('line3', 531),
                 ('line4', 200), ('line5', 834)]
-        pattern = [Gre, Cya]
+        pattern = [Gre, Cya, Pur]
         thresholds = {
             51: Gre, 100: Blu, 350: Yel, 500: Red,
         }
         data = vcolor(test, pattern)
         graph = Pyasciigraph()
         for line in graph.graph('test print', data):
-            table.add_row(line+Whi)
+            table.add_row("", line)
         return table
 
     def input_handler(self) -> list:
@@ -125,13 +126,6 @@ class RichScreen:
                     if char:
                         self.input_chars.append(char)
                         print(char)
-                        if char != '\u2191':
-                            continue
-                        print("Inside")
-                        if style != 'black':
-                            style = "black"
-                        else:
-                            style = 'cyan'
                 except IOError:
                     pass
 
