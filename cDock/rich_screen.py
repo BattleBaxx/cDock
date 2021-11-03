@@ -1,31 +1,23 @@
-import threading
-
-from rich import inspect
-from rich.align import Align
-from rich.text import Text
-from rich.panel import Panel
-# from cDock.console import console
-from rich.console import Console
-from rich.live import Live
-from rich.table import Table
-from rich.style import Style
-from rich.layout import Layout
-from rich import box
-from ascii_graph import Pyasciigraph
-from ascii_graph.colors import *
-from ascii_graph.colordata import vcolor
-from ascii_graph.colordata import hcolor
-
-import termios
 import fcntl
-import sys
 import os
-import time
 import random
 import string
+import sys
+import termios
+import threading
+import time
+
+from ascii_graph import Pyasciigraph
+from ascii_graph.colordata import vcolor
+from ascii_graph.colors import *
+from rich import box
+# from cDock.console import console
+from rich.console import Console
+from rich.layout import Layout
+from rich.live import Live
+from rich.table import Table
 
 from config import Config
-
 
 console = Console()
 char = None
@@ -80,7 +72,7 @@ class RichScreen:
                     live.update(layout)
 
     def generate_table(self, container_details):
-        table = Table(box=box.SIMPLE , width=console.size[0], header_style=self.config.header_color)
+        table = Table(box=box.SIMPLE, width=console.size[0], header_style=self.config.header_color)
         table.add_column("ID")
         table.add_column("Stack")
         table.add_column("Image")
@@ -104,7 +96,7 @@ class RichScreen:
         data = vcolor(test, pattern)
         graph = Pyasciigraph()
         for line in graph.graph('test print', data):
-            table.add_row(line+Whi)
+            table.add_row(line + Whi)
         return table
 
     def input_handler(self) -> list:
