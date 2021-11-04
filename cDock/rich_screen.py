@@ -11,25 +11,36 @@ from ascii_graph import Pyasciigraph
 from ascii_graph.colordata import vcolor
 from ascii_graph.colors import *
 from rich import box
-# from cDock.console import console
+from console import console
 from rich.console import Console
 from rich.layout import Layout
 from rich.live import Live
 from rich.table import Table
+# from rich.style import Style
+from rich.text import Text
 
 from config import Config
 
-console = Console()
+# console = Console()
 char = None
-
-style = "black"
-
 
 class RichScreen:
     def __init__(self):
         self.input_chars = []
         self.config = Config.load_env_from_file("../tests/test.env")
-
+        self.row = 0
+        self.column = 0
+        self.console_screen = None
+        details_dict = {
+            "id": random.randint(0, 600),
+            "image": ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)),
+            "stack": ''.join(random.choices(string.ascii_uppercase + string.digits, k=5)),
+            "created": str(time.time()),
+            "updated": str(time.time())
+        }
+        self.container_details = []
+        for _ in range(10):
+            self.container_details.append(details_dict)
     def render(self):
         x = threading.Thread(target=self.input_handler, args=())
         x.start()
@@ -38,9 +49,27 @@ class RichScreen:
         layout.split_column(Layout(name='details'), Layout(name="containers"))
         layout["details"].split_row(Layout(name='details_1'), Layout(name="details_2"))
         layout["containers"].split_row(Layout(name='container_list'), Layout(name="single_container"))
+        layout["containers"].size = None
         layout["containers"].ratio = 5
-        layout["container_list"].ratio = 2
+        layout["container_list"].ratio = 1
+
         with console.screen():
+            with Live(self.generate_table(self.container_details), refresh_per_second=4) as live:
+                while True:
+                    self.update_container_details()
+                    time.sleep(0.001)
+                    while len(self.input_chars) > 0:
+                        self.input_chars.pop(0)
+                    layout['details_1'].update("End Point: primary\nURL: /var/run/docker.sock")
+                    layout['details_2'].update("Test")
+                    layout['single_container'].update(self.generate_single_table())
+                    layout["container_list"].update(self.generate_table(self.container_details))
+                    # console.print(layout)
+                    live.update(layout)
+
+    def update_container_details(self):
+        self.container_details = []
+        for _ in range(10):
             details_dict = {
                 "id": random.randint(0, 600),
                 "image": ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)),
@@ -48,44 +77,34 @@ class RichScreen:
                 "created": str(time.time()),
                 "updated": str(time.time())
             }
-            container_details.append(details_dict)
-            with Live(self.generate_table(container_details), refresh_per_second=4) as live:
-                while True:
-                    container_details = []
-                    for _ in range(10):
-                        details_dict = {
-                            "id": random.randint(0, 600),
-                            "image": ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)),
-                            "stack": ''.join(random.choices(string.ascii_uppercase + string.digits, k=5)),
-                            "created": str(time.time()),
-                            "updated": str(time.time())
-                        }
-                        container_details.append(details_dict)
-                    time.sleep(0.001)
-                    while len(self.input_chars) > 0:
-                        self.input_chars.pop(0)
-                    layout['details_1'].update("End Point: primary\nURL: /var/run/docker.sock")
-                    layout['details_2'].update("Test")
-                    layout['single_container'].update(self.generate_single_table())
-                    layout["container_list"].update(self.generate_table(container_details))
-                    # console.print(layout)
-                    live.update(layout)
+            self.container_details.append(details_dict)
 
     def generate_table(self, container_details):
-        table = Table(box=box.SIMPLE , width=console.size[0], header_style=self.config.header_color)
+        table = Table(box=box.SIMPLE , width=console.size[0]/2, header_style=self.config.header_color)
         table.add_column("ID")
         table.add_column("Stack")
         table.add_column("Image")
-        table.add_column("Updated")
         table.add_column("Created")
-
-        for details_dict in container_details:
-            table.add_row(str(details_dict['id']), str(details_dict['stack']), str(details_dict['image']),
-                          str(details_dict['created']), str(details_dict['updated']))
+        table.add_column("Updated")
+        for index, details_dict in enumerate(container_details):
+            style = 'white'
+            if index == self.row:
+                style = "cyan"
+            count = 0
+            renderables_list = []
+            for key, value in details_dict.items():
+                text = Text()
+                if count == self.column and index == self.row:
+                    text.append(str(value), style="green bold")
+                else:
+                    text.append(str(value))
+                renderables_list.append(text)
+                count += 1
+            table.add_row(*renderables_list, style=style)
         return table
 
     def generate_single_table(self):
-        table = Table(box=box.SIMPLE, width=console.size[0])
+        table = Table(box=box.SIMPLE)
         table.add_column("")
         test = [('long_label', 423), ('sl', 1234), ('line3', 531),
                 ('line4', 200), ('line5', 834)]
@@ -116,7 +135,14 @@ class RichScreen:
                     char = sys.stdin.read(1)
                     if char:
                         self.input_chars.append(char)
-                        print(char)
+                        if char == 'w' and self.row != 0:
+                            self.row -= 1
+                        elif char == 's' and self.row != len(self.container_details)-1:
+                            self.row += 1
+                        elif char == 'a' and self.column != 0:
+                            self.column -= 1
+                        elif char == 'd' and self.column != len(self.container_details[0].keys())-1:
+                            self.column += 1
                 except IOError:
                     pass
 
