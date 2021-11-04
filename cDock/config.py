@@ -4,12 +4,19 @@ from dotenv import load_dotenv
 
 
 class Config:
-    def __init__(self, socket_url, cert_path, tlf_verify_path, config_path, header_color):
-        self.socket_url = socket_url
-        self.cert_path = cert_path
-        self.tls_verify_path = tlf_verify_path
-        self.config_path = config_path
-        self.header_color = header_color
+    def __init__(self, docker_socket_url, docker_cert_path, docker_tls_verify_path, docker_config_path,
+                 client_list_all_containers, tui_header_color):
+        # Docker daemon options
+        self.docker_socket_url = docker_socket_url
+        self.docker_cert_path = docker_cert_path
+        self.docker_tls_verify_path = docker_tls_verify_path
+        self.docker_config_path = docker_config_path
+
+        # Docker API Client options
+        self.client_list_all_containers = client_list_all_containers
+
+        # TUI options
+        self.tui_header_color = tui_header_color
 
     @staticmethod
     def load_env_from_file(path: str):
@@ -18,13 +25,18 @@ class Config:
         else:
             load_dotenv()
 
-        # Docker environment variables
-        socket_url = os.getenv("DOCKER_SOCKET_URL", "unix://var/run/docker.sock")
-        cert_path = os.getenv("DOCKER_CERT_PATH")
-        tls_verify_path = os.getenv("DOCKER_TLS_VERIFY_PATH")
-        config_path = os.getenv("DOCKER_CONFIG_PATH")
+        config = {
+            # Docker daemon options
+            'docker_socket_url': os.getenv("DOCKER_SOCKET_URL", "unix://var/run/docker.sock"),
+            'docker_cert_path': os.getenv("DOCKER_CERT_PATH"),
+            'docker_tls_verify_path': os.getenv("DOCKER_TLS_VERIFY_PATH"),
+            'docker_config_path': os.getenv("DOCKER_CONFIG_PATH"),
 
-        # Colour environment variables
-        header_color = os.getenv("HEADER_COLOR")
+            # Docker API Client options
+            'client_list_all_containers': os.getenv("DOCKER_API_LIST_ALL_CONTAINERS", False),
 
-        return Config(socket_url, cert_path, tls_verify_path, config_path, header_color)
+            # TUI options
+            'tui_header_color': os.getenv("TUI_HEADER_COLOR")
+        }
+
+        return Config(**config)
