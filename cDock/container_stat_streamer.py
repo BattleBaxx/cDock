@@ -2,11 +2,11 @@ import asyncio
 import logging
 from datetime import datetime
 from threading import Thread
-from typing import Dict
+from typing import Dict, Optional
 
 from docker.models.containers import Container
 
-from cDock.models import DiskIOStats, NetIOStats, MemoryStats
+from cDock.models import DiskIOStats, NetIOStats, MemoryStats, CPUStats
 
 SHA_256_HASH_PICK = 12
 
@@ -43,10 +43,15 @@ class ContainerStatStreamer:
         self.__old_net_io = None
         self.__old_disk_io = None
 
+        # To stream container stats and stop when not required
         self.__stream_task = asyncio.ensure_future(self.__stream_stats())
 
     def stop_stream(self):
-        self.__stream_task.cancel()
+        """
+        Stops the async streamer task
+        """
+        if not self.__stream_task.cancelled():
+            self.__stream_task.cancel()
 
     def get_container(self) -> Container:
         return self.__container
@@ -72,31 +77,27 @@ class ContainerStatStreamer:
         try:
             for stats in self.__stats_generator:
                 self.__stats = stats
-                self.__container.reload()
-                try:
-                    print(self.__container.name)
-                except Exception as e:
-                    print(self.__container.name, "EXP:", type(e), e)
-                finally:
-                    await asyncio.sleep(0.9)
+                await asyncio.sleep(0.9)
         except Exception as e:
-            print("excep", e)
+            logging.error(f"StatsStreamer - Exception while streaming: ({e})")
 
-    def get_cpu_usage(self) -> float:
+    def get_cpu_stats(self) -> CPUStats:
         """
-        Returns a container's CPU usage
-        :return: a float value indicating the CPU usage of the container
+        Returns a container's CPU usage and core count
+        :return: a float value indicating the CPU usage along with core count
         """
-        usage = 0.0
-        cpu = {}
-        precpu = {}
+        cpu_stats = {}
         stats = self.__stats.copy()  # Using a copy to avoid values overwritten while reading
 
         try:
-            cpu['system'] = stats['cpu_stats']['system_cpu_usage']
-            cpu['total'] = stats['cpu_stats']['cpu_usage']['total_usage']
-            precpu['system'] = stats['precpu_stats']['system_cpu_usage']
-            precpu['total'] = stats['precpu_stats']['cpu_usage']['total_usage']
+            cpu = {
+                'system': stats['cpu_stats']['system_cpu_usage'],
+                'total': stats['cpu_stats']['cpu_usage']['total_usage']
+            }
+            precpu = {
+                'system': stats['precpu_stats']['system_cpu_usage'],
+                'total': stats['precpu_stats']['cpu_usage']['total_usage']
+            }
 
             cpu['count'] = stats['cpu_stats'].get('online_cpus')
             if cpu['count'] is None:
@@ -110,37 +111,39 @@ class ContainerStatStreamer:
             system_cpu_delta = cpu['system'] - precpu['system']
             usage = cpu_delta / system_cpu_delta * cpu['count'] * 100
 
-        return usage
+            cpu_stats = {'usage': usage, 'cores': cpu['count']}
 
-    def get_memory_usage(self) -> MemoryStats:
+        return CPUStats(**cpu_stats) if cpu_stats else None
+
+    def get_memory_stats(self) -> Optional[MemoryStats]:
         """
         Returns a container's memory details
-        :return: a dict with the respective details
+        :return: a MemoryStats object
         """
-        details = {}
+        memory_stats = {}
 
         try:
-            memory_stats = self.__stats['memory_stats']
+            container_mem_stats = self.__stats['memory_stats']
 
             # Fixed details
-            details['usage'] = memory_stats['usage']
-            details['limit'] = memory_stats['limit']
+            memory_stats['usage'] = container_mem_stats['usage']
+            memory_stats['limit'] = container_mem_stats['limit']
 
             # Optional details
             if 'stats' in memory_stats:
-                details['cache'] = memory_stats['stats'].get('cache')
-                details['max_usage'] = memory_stats['stats'].get('max_usage')
+                memory_stats['cache'] = container_mem_stats['stats'].get('cache')
+                memory_stats['max_usage'] = container_mem_stats['stats'].get('max_usage')
 
         except KeyError as e:
             logging.debug(f"StatsStreamer - Failed to get Memory stats for `{self.__container.id}` ({e})")
             logging.debug(self.__stats)
 
-        return MemoryStats(**details)
+        return MemoryStats(**memory_stats) if memory_stats else None
 
-    def get_network_io(self) -> NetIOStats:
+    def get_network_io(self) -> Optional[NetIOStats]:
         """
         Returns a container's network transfer details
-        :return: a dict with the respective details
+        :return: a NetIOStats object
         """
         net_io = {}
         stats = self.__stats.copy()  # Using a copy to avoid values overwritten while reading
@@ -162,12 +165,12 @@ class ContainerStatStreamer:
             self.__old_net_io = net_io
 
         # Return the details
-        return NetIOStats(**net_io)
+        return NetIOStats(**net_io) if net_io else None
 
-    def get_disk_io(self) -> DiskIOStats:
+    def get_disk_io(self) -> Optional[DiskIOStats]:
         """
         Returns a container's disk IO transfer details
-        :return: a dict with the respective details
+        :return: a DiskIOStats object
         """
         disk_io = {}
         stats = self.__stats.copy()  # Using a copy to avoid values overwritten while reading
@@ -189,4 +192,4 @@ class ContainerStatStreamer:
             # Storing disk_io details for ior, iow and duration in subsequent call
             self.__old_disk_io = disk_io
 
-        return DiskIOStats(**disk_io)
+        return DiskIOStats(**disk_io) if disk_io else None
