@@ -5,13 +5,14 @@ from docker import DockerClient
 
 from cDock.config import Config
 from cDock.container_stat_streamer import ContainerStatStreamer
+from cDock.models import ContainerView
 
 
 class DockerDaemonClient:
     def __init__(self, config: Config):
         self.__config = config
         self.__client: DockerClient = None
-        self.__containers: Dict[str, ContainerStatStreamer] = {}
+        self.__container_stats_streams: Dict[str, ContainerStatStreamer] = {}
 
     def connect(self):
         try:
@@ -19,6 +20,10 @@ class DockerDaemonClient:
             self.__client = DockerClient(base_url=self.__config.docker_socket_url)
         except Exception as e:
             logging.error(f"DockerDaemonClient - Failed establish connection to docker daemon ({e})")
+
+    def __remove_container(self, container_id: str):
+        if container_id in self.__container_stats_streams:
+            self.__container_stats_streams.pop(container_id).stop_stream()
 
     def update(self) -> Optional[Dict]:
         if not self.__client:
@@ -41,33 +46,56 @@ class DockerDaemonClient:
             return None
 
         for container in containers:
-            if container.id not in self.__containers:
+            if container.id not in self.__container_stats_streams:
+                self.__container_stats_streams[container.id] = ContainerStatStreamer(container)
 
-                self.__containers[container.id] = ContainerStatStreamer(container)
-
-        absent_container_ids = set(self.__containers.keys()) - set([c.id for c in containers])
+        absent_container_ids = set(self.__container_stats_streams.keys()) - set([c.id for c in containers])
         for container_id in absent_container_ids:
-            if container_id in self.__containers:
-                self.__containers.pop(container_id).stop_stream()
+            self.__remove_container(container_id)
+
+        # Generating ContainerView for all containers
+        stats['containers'] = []
+        for container in containers:
+            view = {
+                'name': container.name,
+                'id': container.id,
+                'status': container.attrs['State']['Status'],
+                'image': str(container.image.tags),
+                'created_at': container.attrs['Created'],
+                'command': []
+            }
+            if view['status'] in ['running', 'paused']:
+                view['started_at'] = container.attrs['State']['StartedAt']
+                view['cpu_stats'] = self.__container_stats_streams[container.id].get_cpu_stats()
+                view['memory_stats'] = self.__container_stats_streams[container.id].get_memory_stats()
+                view['net_io_stats'] = self.__container_stats_streams[container.id].get_network_io()
+                view['disk_io_stats'] = self.__container_stats_streams[container.id].get_disk_io()
+                view['ports'] = container.attrs['Config']['ExposedPorts']
+                if container.attrs['Config'].get('Entrypoint', None):
+                    view['command'].extend(container.attrs['Config'].get('Entrypoint', []))
+                if container.attrs['Config'].get('Cmd', None):
+                    view['command'].extend(container.attrs['Config'].get('Cmd', []))
+
+            stats['containers'].append(ContainerView(**view))
 
         return stats
 
     def start(self, container_id: str):
-        if container_id not in self.__containers:
+        if container_id not in self.__container_stats_streams:
             raise Exception('unknown container')
-        self.__containers[container_id].get_container().start()
+        self.__container_stats_streams[container_id].get_container().start()
 
     def restart(self, container_id: str):
-        if container_id not in self.__containers:
+        if container_id not in self.__container_stats_streams:
             raise Exception('unknown container')
-        self.__containers[container_id].get_container().restart()
+        self.__container_stats_streams[container_id].get_container().restart()
 
     def stop(self, container_id: str):
-        if container_id not in self.__containers:
+        if container_id not in self.__container_stats_streams:
             raise Exception('unknown container')
-        self.__containers[container_id].get_container().stop()
+        self.__container_stats_streams[container_id].get_container().stop()
 
     def kill(self, container_id: str):
-        if container_id not in self.__containers:
+        if container_id not in self.__container_stats_streams:
             raise Exception('unknown container')
-        self.__containers[container_id].get_container().kill()
+        self.__container_stats_streams[container_id].get_container().kill()
