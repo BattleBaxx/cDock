@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from pydantic import BaseModel
@@ -13,6 +13,7 @@ class MemoryStats(BaseModel):
 
 class NetIOStats(BaseModel):
     read_time: Optional[datetime]
+    duration: Optional[timedelta]
     total_rx: Optional[int]
     total_tx: Optional[int]
     rx: Optional[int]
@@ -21,6 +22,7 @@ class NetIOStats(BaseModel):
 
 class DiskIOStats(BaseModel):
     read_time: Optional[datetime]
+    duration: Optional[timedelta]
     total_ior: Optional[int]
     total_iow: Optional[int]
     ior: Optional[int]
