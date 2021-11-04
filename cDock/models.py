@@ -4,41 +4,46 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 
+class CPUStats(BaseModel):
+    usage: float
+    cores: int
+
+
 class MemoryStats(BaseModel):
-    usage: Optional[int]
-    limit: Optional[int]
+    usage: int
+    limit: int
     cache: Optional[int]
     max_usage: Optional[int]
 
 
 class NetIOStats(BaseModel):
-    read_time: Optional[datetime]
-    duration: Optional[timedelta]
-    total_rx: Optional[int]
-    total_tx: Optional[int]
+    total_rx: int
+    total_tx: int
+    read_time: datetime
     rx: Optional[int]
     tx: Optional[int]
+    duration: Optional[timedelta]
 
 
 class DiskIOStats(BaseModel):
-    read_time: Optional[datetime]
-    duration: Optional[timedelta]
-    total_ior: Optional[int]
-    total_iow: Optional[int]
+    total_ior: int
+    total_iow: int
+    read_time: datetime
     ior: Optional[int]
     iow: Optional[int]
+    duration: Optional[timedelta]
 
 
 class ContainerView(BaseModel):
     status: str  # Enum?
     name: str
     id: str
-    cpu_percent: str
-    memory_stats: MemoryStats
-    net_io_stats: NetIOStats
-    disk_io_stats: DiskIOStats
     image: str
+    cpu_stats: Optional[CPUStats]
+    memory_stats: Optional[MemoryStats]
+    net_io_stats: Optional[NetIOStats]
+    disk_io_stats: Optional[DiskIOStats]
     created_at: datetime
     started_at: Optional[datetime]
     published_ports: List[str] = []
-    command: Optional[str]
+    command: Optional[List[str]] = []
