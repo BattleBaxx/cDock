@@ -142,9 +142,9 @@ class ContainerStatStreamer:
         stats = self.__stats.copy()  # Using a copy to avoid values overwritten while reading
 
         try:
-            net_io['read_time'] = read_iso_timestamp(stats['read'])
             net_io['total_rx'] = stats['networks']['eth0']['rx_bytes']
             net_io['total_tx'] = stats['networks']['eth0']['tx_bytes']
+            net_io['read_time'] = read_iso_timestamp(stats['read'])
         except KeyError as e:
             logging.debug(f"StatsStreamer - Failed to get Network IO for `{self.__container.id}` ({e})")
             logging.debug(stats)
@@ -170,10 +170,10 @@ class ContainerStatStreamer:
 
         try:
             io_service_bytes_recursive = stats["blkio_stats"]['io_service_bytes_recursive']
-            disk_io['read_time'] = read_iso_timestamp(stats['read'])
             disk_io['total_ior'] = [i for i in io_service_bytes_recursive if i['op'].upper() == 'READ'][0]['value']
             disk_io['total_iow'] = [i for i in io_service_bytes_recursive if i['op'].upper() == 'WRITE'][0]['value']
-        except KeyError as e:
+            disk_io['read_time'] = read_iso_timestamp(stats['read'])
+        except (KeyError, TypeError) as e:
             logging.debug(f"StatsStreamer - Failed to get Disk IO for `{self.__container.id}` ({e})")
             logging.debug(stats)
         else:
