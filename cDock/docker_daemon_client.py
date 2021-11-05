@@ -4,6 +4,7 @@ from threading import Thread
 from typing import Dict, Optional
 
 from docker import DockerClient
+from docker.models.containers import Container
 
 from cDock.config import Config
 from cDock.container_stat_streamer import ContainerStatStreamer
@@ -29,9 +30,10 @@ class DockerDaemonClient:
         if not self.__streaming_event_loop_thread.is_alive():
             self.__streaming_event_loop_thread.start()
 
-    def __remove_container(self, container_id: str):
-        if container_id in self.__container_stats_streams:
-            self.__container_stats_streams.pop(container_id).stop_stream()
+    def __remove_container(self, container_name: str):
+        if container_name in self.__container_stats_streams:
+            logging.info(f"DockerDaemonClient - Stopping streamer for {container_name}")
+            self.__container_stats_streams.pop(container_name).stop_stream()
 
     def connect(self):
         if self.__client:
@@ -66,13 +68,14 @@ class DockerDaemonClient:
             return None
 
         for container in containers:
-            if container.id not in self.__container_stats_streams:
+            if container.name not in self.__container_stats_streams:
+                logging.info(f"DockerDaemonClient - Starting streamer for {container.name}")
                 streamer = ContainerStatStreamer(container, self.__streaming_event_loop)
-                self.__container_stats_streams[container.id] = streamer
+                self.__container_stats_streams[container.name] = streamer
 
-        absent_container_ids = set(self.__container_stats_streams.keys()) - set([c.id for c in containers])
-        for container_id in absent_container_ids:
-            self.__remove_container(container_id)
+        absent_container_name = set(self.__container_stats_streams.keys()) - set([c.name for c in containers])
+        for container_name in absent_container_name:
+            self.__remove_container(container_name)
 
         # Generating ContainerView for all containers
         stats['containers'] = []
@@ -86,37 +89,45 @@ class DockerDaemonClient:
                 'command': []
             }
             if view['status'] in ['running', 'paused']:
-                view['started_at'] = container.attrs['State']['StartedAt']
-                view['cpu_stats'] = self.__container_stats_streams[container.id].get_cpu_stats()
-                view['memory_stats'] = self.__container_stats_streams[container.id].get_memory_stats()
-                view['net_io_stats'] = self.__container_stats_streams[container.id].get_network_io()
-                view['disk_io_stats'] = self.__container_stats_streams[container.id].get_disk_io()
-                view['ports'] = container.attrs['Config'].get('ExposedPorts', [])
-                if container.attrs['Config'].get('Entrypoint', None):
-                    view['command'].extend(container.attrs['Config'].get('Entrypoint', []))
-                if container.attrs['Config'].get('Cmd', None):
-                    view['command'].extend(container.attrs['Config'].get('Cmd', []))
-
+                view |= self.__get_active_container_stats(container)
             stats['containers'].append(ContainerView(**view))
 
         return stats
 
-    def start(self, container_id: str):
-        if container_id not in self.__container_stats_streams:
-            raise Exception('unknown container')
-        self.__container_stats_streams[container_id].get_container().start()
+    def __get_active_container_stats(self, container: Container):
+        stats = {'command': []}
+        try:
+            stats['started_at'] = container.attrs['State']['StartedAt']
+            stats['cpu_stats'] = self.__container_stats_streams[container.name].get_cpu_stats()
+            stats['memory_stats'] = self.__container_stats_streams[container.name].get_memory_stats()
+            stats['net_io_stats'] = self.__container_stats_streams[container.name].get_network_io()
+            stats['disk_io_stats'] = self.__container_stats_streams[container.name].get_disk_io()
+            stats['ports'] = container.attrs['Config'].get('ExposedPorts', [])
+            if container.attrs['Config'].get('Entrypoint', None):
+                stats['command'].extend(container.attrs['Config'].get('Entrypoint', []))
+            if container.attrs['Config'].get('Cmd', None):
+                stats['command'].extend(container.attrs['Config'].get('Cmd', []))
+        except Exception as e:
+            logging.error(f"DockerDaemonClient - Failed getting active stats for {container.name} ({e})")
+            logging.error(container)
+        return stats
 
-    def restart(self, container_id: str):
-        if container_id not in self.__container_stats_streams:
+    def start(self, container_name: str):
+        if container_name not in self.__container_stats_streams:
             raise Exception('unknown container')
-        self.__container_stats_streams[container_id].get_container().restart()
+        self.__container_stats_streams[container_name].get_container().start()
 
-    def stop(self, container_id: str):
-        if container_id not in self.__container_stats_streams:
+    def restart(self, container_name: str):
+        if container_name not in self.__container_stats_streams:
             raise Exception('unknown container')
-        self.__container_stats_streams[container_id].get_container().stop()
+        self.__container_stats_streams[container_name].get_container().restart()
 
-    def kill(self, container_id: str):
-        if container_id not in self.__container_stats_streams:
+    def stop(self, container_name: str):
+        if container_name not in self.__container_stats_streams:
             raise Exception('unknown container')
-        self.__container_stats_streams[container_id].get_container().kill()
+        self.__container_stats_streams[container_name].get_container().stop()
+
+    def kill(self, container_name: str):
+        if container_name not in self.__container_stats_streams:
+            raise Exception('unknown container')
+        self.__container_stats_streams[container_name].get_container().kill()
