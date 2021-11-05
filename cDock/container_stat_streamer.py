@@ -13,21 +13,13 @@ SHA_256_HASH_PICK = 12
 
 def read_iso_timestamp(timestamp_str: str) -> datetime:
     """
-    A utility method to convert Docker APIs timestamp into datetime objects
+    A utility method to convert Docker API's timestamp into datetime objects.
+    Removes characters after `.` or `Z` in the timestamp as datetime doesnt accept it
     :param timestamp_str: ISO 8061 string timestamp
     :return: corresponding datetime instance
     """
-    # index = timestamp_str.rfind('Z')
-    # if index != -1:
-    #     timestamp_str = timestamp_str[:index]
-    #
-    # index = timestamp_str.rfind('.')
-    # if index != -1:
-    #     timestamp_str = timestamp_str[:index + 4]
-
-    # Hard coding to 19 chars for lesser computation
+    # Hard coding to 19 chars as that filters out excess text
     timestamp_str = timestamp_str[:19]
-
     return datetime.fromisoformat(timestamp_str)
 
 
@@ -80,7 +72,7 @@ class ContainerStatStreamer:
                 self.__stats = stats
                 await asyncio.sleep(0.9)
         except Exception as e:
-            logging.error(f"StatsStreamer - Exception while streaming: ({e})")
+            logging.error(f"StatsStreamer - Exiting. Exception while streaming: ({e})")
 
     def get_cpu_stats(self) -> CPUStats:
         """
