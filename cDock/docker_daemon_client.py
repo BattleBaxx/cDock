@@ -70,7 +70,7 @@ class DockerDaemonClient:
                 view['memory_stats'] = self.__container_stats_streams[container.id].get_memory_stats()
                 view['net_io_stats'] = self.__container_stats_streams[container.id].get_network_io()
                 view['disk_io_stats'] = self.__container_stats_streams[container.id].get_disk_io()
-                view['ports'] = container.attrs['Config']['ExposedPorts']
+                view['ports'] = container.attrs['Config'].get('ExposedPorts', [])
                 if container.attrs['Config'].get('Entrypoint', None):
                     view['command'].extend(container.attrs['Config'].get('Entrypoint', []))
                 if container.attrs['Config'].get('Cmd', None):
