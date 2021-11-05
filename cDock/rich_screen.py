@@ -6,6 +6,7 @@ import sys
 import termios
 import threading
 import time
+import logging
 
 from ascii_graph import Pyasciigraph
 from ascii_graph.colordata import vcolor
@@ -24,13 +25,24 @@ from config import Config
 # console = Console()
 char = None
 
+logging.basicConfig(filename="log.txt",
+                            filemode='a',
+                            format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+                            datefmt='%H:%M:%S',
+                            level=logging.DEBUG)
+
 class RichScreen:
     def __init__(self):
         self.input_chars = []
         self.config = Config.load_env_from_file("../tests/test.env")
         self.row = 0
         self.column = 0
-        self.console_screen = None
+        self.refresh_layout = True
+        self.layout = None
+        self.single_container_view = True
+
+
+        self.logger = logging.getLogger(__name__)
         details_dict = {
             "id": random.randint(0, 600),
             "image": ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)),
@@ -41,31 +53,44 @@ class RichScreen:
         self.container_details = []
         for _ in range(10):
             self.container_details.append(details_dict)
+
     def render(self):
         x = threading.Thread(target=self.input_handler, args=())
         x.start()
-        container_details = []
-        layout = Layout()
-        layout.split_column(Layout(name='details'), Layout(name="containers"))
-        layout["details"].split_row(Layout(name='details_1'), Layout(name="details_2"))
-        layout["containers"].split_row(Layout(name='container_list'), Layout(name="single_container"))
-        layout["containers"].size = None
-        layout["containers"].ratio = 5
-        layout["container_list"].ratio = 1
-
         with console.screen():
-            with Live(self.generate_table(self.container_details), refresh_per_second=4) as live:
+            with Live("", refresh_per_second=4) as live:
                 while True:
                     self.update_container_details()
+                    self.update_layout()
                     time.sleep(0.001)
                     while len(self.input_chars) > 0:
                         self.input_chars.pop(0)
-                    layout['details_1'].update("End Point: primary\nURL: /var/run/docker.sock")
-                    layout['details_2'].update("Test")
-                    layout['single_container'].update(self.generate_single_table())
-                    layout["container_list"].update(self.generate_table(self.container_details))
-                    # console.print(layout)
-                    live.update(layout)
+                    live.update(self.layout)
+
+    def update_layout(self):
+        if self.refresh_layout:
+            self.refresh_layout = False
+            self.layout = Layout()
+            self.layout.split_column(Layout(name='details'), Layout(name="containers"))
+            self.layout["details"].split_row(Layout(name='details_1'), Layout(name="details_2"))
+            self.layout["containers"].ratio = 5
+
+            if self.single_container_view:
+                self.layout["containers"].split_row(Layout(name='container_list'), Layout(name="single_container"))
+                self.layout["container_list"].ratio = 1
+                self.layout["containers"].size = None
+
+        if self.single_container_view:
+            self.layout['single_container'].update(self.generate_single_table())
+            self.layout["container_list"].update(self.generate_table(self.container_details))
+        else:
+            pass
+            self.layout["containers"].update(self.generate_table(self.container_details))
+
+        self.layout['details_1'].update("End Point: primary\nURL: /var/run/docker.sock")
+        self.layout['details_2'].update("Test")
+
+
 
     def update_container_details(self):
         self.container_details = []
@@ -80,7 +105,12 @@ class RichScreen:
             self.container_details.append(details_dict)
 
     def generate_table(self, container_details):
-        table = Table(box=box.SIMPLE , width=console.size[0]/2, header_style=self.config.header_color)
+        if not self.single_container_view:
+            size = console.size[0]
+        else:
+            # self.logger.info(self.layout["containers"].size)
+            size = console.size[0]/2
+        table = Table(box=box.SIMPLE , width=size, header_style=self.config.header_color)
         table.add_column("ID")
         table.add_column("Stack")
         table.add_column("Image")
@@ -135,6 +165,7 @@ class RichScreen:
                     char = sys.stdin.read(1)
                     if char:
                         self.input_chars.append(char)
+                        logging.info(char)
                         if char == 'w' and self.row != 0:
                             self.row -= 1
                         elif char == 's' and self.row != len(self.container_details)-1:
@@ -143,6 +174,9 @@ class RichScreen:
                             self.column -= 1
                         elif char == 'd' and self.column != len(self.container_details[0].keys())-1:
                             self.column += 1
+                        elif char == 'l':
+                            self.refresh_layout = True
+                            self.single_container_view = not self.single_container_view
                 except IOError:
                     pass
 
