@@ -1,4 +1,6 @@
+import asyncio
 import logging
+from threading import Thread
 from typing import Dict, Optional
 
 from docker import DockerClient
@@ -14,16 +16,34 @@ class DockerDaemonClient:
         self.__client: DockerClient = None
         self.__container_stats_streams: Dict[str, ContainerStatStreamer] = {}
 
-    def connect(self):
-        try:
-            # TODO: lookup usage for certs
-            self.__client = DockerClient(base_url=self.__config.docker_socket_url)
-        except Exception as e:
-            logging.error(f"DockerDaemonClient - Failed establish connection to docker daemon ({e})")
+        # For streaming container stats in a background thread
+        self.__streaming_event_loop = asyncio.new_event_loop()
+        self.__streaming_event_loop_thread = Thread(target=self.__run_streaming_event_loop)
+        self.__streaming_event_loop_thread.daemon = True
+
+    def __run_streaming_event_loop(self):
+        asyncio.set_event_loop(self.__streaming_event_loop)
+        self.__streaming_event_loop.run_forever()
+
+    def __start_streaming_event_loop_thread(self):
+        if not self.__streaming_event_loop_thread.is_alive():
+            self.__streaming_event_loop_thread.start()
 
     def __remove_container(self, container_id: str):
         if container_id in self.__container_stats_streams:
             self.__container_stats_streams.pop(container_id).stop_stream()
+
+    def connect(self):
+        if self.__client:
+            raise Exception("DockerDaemonClient - Already connection to a daemon")
+        try:
+            # TODO: lookup usage for certs
+            self.__client = DockerClient(base_url=self.__config.docker_socket_url)
+        except Exception as e:
+            self.__client = None
+            logging.error(f"DockerDaemonClient - Failed establish connection to docker daemon ({e})")
+        else:
+            self.__start_streaming_event_loop_thread()
 
     def update(self) -> Optional[Dict]:
         if not self.__client:
@@ -47,7 +67,8 @@ class DockerDaemonClient:
 
         for container in containers:
             if container.id not in self.__container_stats_streams:
-                self.__container_stats_streams[container.id] = ContainerStatStreamer(container)
+                streamer = ContainerStatStreamer(container, self.__streaming_event_loop)
+                self.__container_stats_streams[container.id] = streamer
 
         absent_container_ids = set(self.__container_stats_streams.keys()) - set([c.id for c in containers])
         for container_id in absent_container_ids:

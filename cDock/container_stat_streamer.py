@@ -33,18 +33,19 @@ def read_iso_timestamp(timestamp_str: str) -> datetime:
 
 class ContainerStatStreamer:
 
-    def __init__(self, container: Container):
+    def __init__(self, container: Container, loop: asyncio.AbstractEventLoop):
         self.__stats: Dict = {}
         self.__container: Container = container
         self.__time_initialized = datetime.now()
         self.__stats_generator = self.__container.stats(decode=True)
+        self.__streaming_event_loop = loop
 
         # To calculate with details from Docker API
         self.__old_net_io = None
         self.__old_disk_io = None
 
         # To stream container stats and stop when not required
-        self.__stream_task = asyncio.ensure_future(self.__stream_stats())
+        self.__stream_task = asyncio.run_coroutine_threadsafe(self.__stream_stats(), self.__streaming_event_loop)
 
     def stop_stream(self):
         """
