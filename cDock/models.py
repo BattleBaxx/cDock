@@ -46,4 +46,4 @@ class ContainerView(BaseModel):
     created_at: datetime
     started_at: Optional[datetime]
     published_ports: List[str] = []
-    command: Optional[List[str]] = []
+    command: List[str] = []

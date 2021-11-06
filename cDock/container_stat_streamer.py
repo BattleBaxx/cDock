@@ -80,7 +80,7 @@ class ContainerStatStreamer:
         :return: a float value indicating the CPU usage along with core count
         """
         cpu_stats = {}
-        stats = self.__stats.copy()  # Using a copy to avoid values overwritten while reading
+        stats = self.__stats  # Using a copy to avoid values overwritten while reading
 
         try:
             cpu = {
@@ -139,7 +139,7 @@ class ContainerStatStreamer:
         :return: a NetIOStats object
         """
         net_io = {}
-        stats = self.__stats.copy()  # Using a copy to avoid values overwritten while reading
+        stats = self.__stats  # Using a copy to avoid values overwritten while reading
 
         try:
             net_io['total_rx'] = stats['networks']['eth0']['rx_bytes']
@@ -166,7 +166,7 @@ class ContainerStatStreamer:
         :return: a DiskIOStats object
         """
         disk_io = {}
-        stats = self.__stats.copy()  # Using a copy to avoid values overwritten while reading
+        stats = self.__stats  # Using a copy to avoid values overwritten while reading
 
         try:
             io_service_bytes_recursive = stats["blkio_stats"]['io_service_bytes_recursive']
