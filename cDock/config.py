@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 class Config:
     def __init__(self, docker_socket_url, docker_cert_path, docker_tls_verify_path, docker_config_path,
-                 client_list_all_containers, tui_header_color):
+                 client_list_all_containers, tui_header_color, priority_attributes):
         # Docker daemon options
         self.docker_socket_url = docker_socket_url
         self.docker_cert_path = docker_cert_path
@@ -17,6 +17,7 @@ class Config:
 
         # TUI options
         self.tui_header_color = tui_header_color
+        self.priority_attributes = priority_attributes
 
     @staticmethod
     def load_env_from_file(path: str):
@@ -36,7 +37,8 @@ class Config:
             'client_list_all_containers': os.getenv("DOCKER_API_LIST_ALL_CONTAINERS", False),
 
             # TUI options
-            'tui_header_color': os.getenv("TUI_HEADER_COLOR")
+            'tui_header_color': os.getenv("TUI_HEADER_COLOR"),
+            'priority_attributes':os.getenv("PRIORITY_ATTRIBUTES")
         }
 
         return Config(**config)

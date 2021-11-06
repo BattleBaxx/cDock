@@ -1,4 +1,5 @@
 import fcntl
+import logging
 import os
 import random
 import string
@@ -6,30 +7,40 @@ import sys
 import termios
 import threading
 import time
-import logging
 
 from ascii_graph import Pyasciigraph
-from ascii_graph.colordata import vcolor
-from ascii_graph.colors import *
 from rich import box
-from console import console
-from rich.console import Console
 from rich.layout import Layout
 from rich.live import Live
 from rich.table import Table
 # from rich.style import Style
 from rich.text import Text
 
+from models import ContainerView
+from console import console
 from config import Config
+from docker_daemon_client import DockerDaemonClient
 
 # console = Console()
-char = None
+# char = None
+ui_to_container_view = {
+    "name": "name",
+    "id": "id",
+    "status": "status",
+    "image": "image",
+    "cpu": "cpu_stats.usage",
+    "mem_usage": "memory_stats.usage",
+    "mem_limit": "memory_stats.limit",
+    "rx/s": "net_io_stats.rx",
+    "tx/s": "net_io_stats.tx",
+    "ior/s": "disk_io_stats.ior",
+    "iow/s": "disk_io_stats.iow",
+    "created": "created_at",
+    "started": "started_at",
+    "ports": "published_ports",
+    "command": "command"
+}
 
-logging.basicConfig(filename="log.txt",
-                            filemode='a',
-                            format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-                            datefmt='%H:%M:%S',
-                            level=logging.DEBUG)
 
 class RichScreen:
     def __init__(self):
@@ -41,18 +52,16 @@ class RichScreen:
         self.layout = None
         self.single_container_view = True
 
-
         self.logger = logging.getLogger(__name__)
-        details_dict = {
-            "id": random.randint(0, 600),
-            "image": ''.join(random.choices(string.ascii_uppercase + string.digits, k=10)),
-            "stack": ''.join(random.choices(string.ascii_uppercase + string.digits, k=5)),
-            "created": str(time.time()),
-            "updated": str(time.time())
-        }
-        self.container_details = []
-        for _ in range(10):
-            self.container_details.append(details_dict)
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.addHandler(logging.FileHandler('log.txt', mode="w"))
+
+        config = Config.load_env_from_file(None)
+        try:
+            self.client = DockerDaemonClient(config)
+            self.client.connect()
+        except KeyboardInterrupt:
+            pass
 
     def render(self):
         x = threading.Thread(target=self.input_handler, args=())
@@ -68,29 +77,30 @@ class RichScreen:
                     live.update(self.layout)
 
     def update_layout(self):
-        if self.refresh_layout:
-            self.refresh_layout = False
-            self.layout = Layout()
-            self.layout.split_column(Layout(name='details'), Layout(name="containers"))
-            self.layout["details"].split_row(Layout(name='details_1'), Layout(name="details_2"))
-            self.layout["containers"].ratio = 5
+        try:
+            if self.refresh_layout:
+                self.refresh_layout = False
+                self.layout = Layout()
+                self.layout.split_column(Layout(name='details'), Layout(name="containers"))
+                self.layout["details"].split_row(Layout(name='details_1'), Layout(name="details_2"))
+                self.layout["containers"].ratio = 5
+
+                if self.single_container_view:
+                    self.layout["containers"].split_row(Layout(name='container_list'), Layout(name="single_container"))
+                    self.layout["container_list"].ratio = 1
+                    self.layout["containers"].size = None
 
             if self.single_container_view:
-                self.layout["containers"].split_row(Layout(name='container_list'), Layout(name="single_container"))
-                self.layout["container_list"].ratio = 1
-                self.layout["containers"].size = None
+                self.layout['single_container'].update("Test")
+                self.layout["container_list"].update(self.generate_table(self.client.update()))
+            else:
+                pass
+                self.layout["containers"].update(self.generate_table(self.client.update()))
 
-        if self.single_container_view:
-            self.layout['single_container'].update(self.generate_single_table())
-            self.layout["container_list"].update(self.generate_table(self.container_details))
-        else:
+            self.layout['details_1'].update("End Point: primary\nURL: /var/run/docker.sock")
+            self.layout['details_2'].update("Test")
+        except KeyboardInterrupt:
             pass
-            self.layout["containers"].update(self.generate_table(self.container_details))
-
-        self.layout['details_1'].update("End Point: primary\nURL: /var/run/docker.sock")
-        self.layout['details_2'].update("Test")
-
-
 
     def update_container_details(self):
         self.container_details = []
@@ -104,52 +114,61 @@ class RichScreen:
             }
             self.container_details.append(details_dict)
 
-    def generate_table(self, container_details):
+    def generate_table(self, stats):
         if not self.single_container_view:
             size = console.size[0]
+            rendering_attributes = ui_to_container_view.keys()
         else:
-            # self.logger.info(self.layout["containers"].size)
-            size = console.size[0]/2
-        table = Table(box=box.SIMPLE , width=size, header_style=self.config.header_color)
-        table.add_column("ID")
-        table.add_column("Stack")
-        table.add_column("Image")
-        table.add_column("Created")
-        table.add_column("Updated")
-        for index, details_dict in enumerate(container_details):
+            rendering_attributes = self.config.priority_attributes.split(",")
+            size = console.size[0] / 2
+        table = Table(box=box.SIMPLE, width=size, header_style=self.config.tui_header_color)
+        for attr in rendering_attributes:
+            table.add_column(attr)
+        for index, view in enumerate(stats):
             style = 'white'
             if index == self.row:
                 style = "cyan"
-            count = 0
-            renderables_list = []
-            for key, value in details_dict.items():
-                text = Text()
-                if count == self.column and index == self.row:
-                    text.append(str(value), style="green bold")
-                else:
-                    text.append(str(value))
-                renderables_list.append(text)
-                count += 1
-            table.add_row(*renderables_list, style=style)
+            table.add_row(*self.generate_row(view, index), style=style)
         return table
 
-    def generate_single_table(self):
-        table = Table(box=box.SIMPLE)
-        table.add_column("")
-        test = [('long_label', 423), ('sl', 1234), ('line3', 531),
-                ('line4', 200), ('line5', 834)]
-        pattern = [Gre, Cya, Pur]
-        thresholds = {
-            51: Gre, 100: Blu, 350: Yel, 500: Red,
-        }
-        data = vcolor(test, pattern)
-        graph = Pyasciigraph()
-        for line in graph.graph('test print', data):
-            table.add_row("", line)
-        return table
+    def generate_row(self, view: ContainerView, index):
+        if not self.single_container_view:
+            rendering_attributes = ui_to_container_view.keys()
+        else:
+            rendering_attributes = self.config.priority_attributes.split(",")
+        count = 0
+        renderables_list = []
+        for attr in rendering_attributes:
+            text = Text()
+            style = ""
+            if count == self.column and index == self.row:
+                style = "green bold"
+            attr = ui_to_container_view[attr].split(".")
+            if len(attr) == 1:
+                value = getattr(view, attr[0])
+            else:
+                value = getattr(getattr(view, attr[0]), attr[1])
+            text.append(str(value), style=style)
+            renderables_list.append(text)
+            count += 1
+        return renderables_list
+
+    # def generate_single_table(self):
+    #     table = Table(box=box.SIMPLE)
+    #     table.add_column("")
+    #     test = [('long_label', 423), ('sl', 1234), ('line3', 531),
+    #             ('line4', 200), ('line5', 834)]
+    #     pattern = [Gre, Cya, Pur]
+    #     thresholds = {
+    #         51: Gre, 100: Blu, 350: Yel, 500: Red,
+    #     }
+    #     data = vcolor(test, pattern)
+    #     graph = Pyasciigraph()
+    #     for line in graph.graph('test print', data):
+    #         table.add_row("", line)
+    #     return table
 
     def input_handler(self) -> list:
-        global style
         fd = sys.stdin.fileno()
         oldterm = termios.tcgetattr(fd)
         newattr = termios.tcgetattr(fd)
@@ -168,11 +187,11 @@ class RichScreen:
                         logging.info(char)
                         if char == 'w' and self.row != 0:
                             self.row -= 1
-                        elif char == 's' and self.row != len(self.container_details)-1:
+                        elif char == 's' and self.row != len(self.container_details) - 1:
                             self.row += 1
                         elif char == 'a' and self.column != 0:
                             self.column -= 1
-                        elif char == 'd' and self.column != len(self.container_details[0].keys())-1:
+                        elif char == 'd' and self.column != len(self.container_details[0].keys()) - 1:
                             self.column += 1
                         elif char == 'l':
                             self.refresh_layout = True
