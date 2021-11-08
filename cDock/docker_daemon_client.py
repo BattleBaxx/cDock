@@ -10,14 +10,14 @@ from cDock.config import Config
 from cDock.container_stat_streamer import ContainerStatStreamer
 from cDock.models import ContainerView
 
-STREAMING_STATUS = ['running', 'paused']
-
 
 class DockerDaemonClient:
     """
     This class is a wrapper around DockerClient and provider features to stream stats of containers and retrieve them
     in a simpler format.
     """
+
+    STREAMING_STATUS = ['running', 'paused']
 
     def __init__(self, config: Config):
         self.__config = config
@@ -58,12 +58,12 @@ class DockerDaemonClient:
             logging.debug(f"DockerDaemonClient - Updating container {container.name}")
         self.__containers[container.name] = container
 
-        if container.name not in self.__container_stats_streams and container.status in STREAMING_STATUS:
+        if container.name not in self.__container_stats_streams and container.status in self.STREAMING_STATUS:
             logging.debug(f"DockerDaemonClient - Starting streamer for {container.name}")
             streamer = ContainerStatStreamer(container, self.__streaming_event_loop)
             self.__container_stats_streams[container.name] = streamer
 
-        elif container.name in self.__container_stats_streams and container.status not in STREAMING_STATUS:
+        elif container.name in self.__container_stats_streams and container.status not in self.STREAMING_STATUS:
             logging.debug(f"DockerDaemonClient - Stopping streamer for {container.name}")
             self.__container_stats_streams.pop(container.name).stop_stream()
 
@@ -126,7 +126,7 @@ class DockerDaemonClient:
             'image': str(container.image.tags),
             'created_at': container.attrs['Created'],
         }
-        if view['status'] in STREAMING_STATUS:
+        if view['status'] in self.STREAMING_STATUS:
             view |= self.__get_active_container_stats(container)
 
         return ContainerView(**view)
