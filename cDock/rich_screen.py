@@ -7,7 +7,7 @@ import sys
 import termios
 import threading
 import time
-
+import pydevd_pycharm
 from ascii_graph import Pyasciigraph
 from rich import box
 from rich.layout import Layout
@@ -16,10 +16,10 @@ from rich.table import Table
 # from rich.style import Style
 from rich.text import Text
 
-from models import ContainerView
-from console import console
-from config import Config
-from docker_daemon_client import DockerDaemonClient
+from cDock.models import ContainerView
+from cDock.console import console
+from cDock.config import Config
+from cDock.docker_daemon_client import DockerDaemonClient
 
 # console = Console()
 # char = None
@@ -41,6 +41,7 @@ ui_to_container_view = {
     "command": "command"
 }
 
+pydevd_pycharm.settrace('localhost', port=6969, stdoutToServer = True, stderrToServer = True)
 
 class RichScreen:
     def __init__(self):
