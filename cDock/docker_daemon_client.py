@@ -30,6 +30,10 @@ class DockerDaemonClient:
         self.__streaming_event_loop_thread = Thread(target=self.__run_streaming_event_loop)
         self.__streaming_event_loop_thread.daemon = True
 
+        # For cleaning up executing container actions
+        self.__container_action_map: Dict[str, Thread] = {}
+        asyncio.run_coroutine_threadsafe(self.__clean_container_action_threads(), self.__streaming_event_loop)
+
     def __run_streaming_event_loop(self) -> None:
         """
         A utility method used to run the event loop for stats streaming in a background thread.
@@ -43,6 +47,32 @@ class DockerDaemonClient:
         """
         if not self.__streaming_event_loop_thread.is_alive():
             self.__streaming_event_loop_thread.start()
+
+    async def __clean_container_action_threads(self):
+        """
+        Async task that cleans up container action_executor threads when they get completed
+        """
+        while True:
+            for key, thread in self.__container_action_map.items():
+                if not thread.is_alive():
+                    self.__container_action_map.pop(key)
+            await asyncio.sleep(0.3)
+
+    def __container_action(self, container_name: str, action: str, *args, **kwargs):
+        if container_name not in self.__containers:
+            raise Exception('Unknown container!')
+        if not hasattr(self.__containers[container_name], action):
+            raise Exception('Unknown action_executor!')
+
+        key = f"{container_name}/{action}"
+        if key in self.__container_action_map:
+            raise Exception('Another action_executor in progress!')
+
+        action_executor = getattr(self.__containers[container_name], action)
+        thread = Thread(target=action_executor, args=args, kwargs=kwargs)
+        thread.daemon = True
+        thread.start()
+        self.__container_action_map[key] = thread
 
     def __upsert_container(self, container: Container) -> None:
         """
@@ -183,15 +213,6 @@ class DockerDaemonClient:
         stats['container_views'] = [self.__generate_container_view(container) for container in containers]
 
         return stats
-
-    def __container_action(self, container_name: str, action: str, *args, **kwargs):
-        if container_name not in self.__containers:
-            raise Exception('Unknown container!')
-        if not hasattr(self.__containers[container_name], action):
-            raise Exception('Unknown action!')
-
-        action = getattr(self.__containers[container_name], action)
-        return action(*args, **kwargs)
 
     def start(self, container_name: str):
         self.__container_action(container_name, 'start')
