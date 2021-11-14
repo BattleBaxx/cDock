@@ -91,6 +91,7 @@ class DockerDaemonClient:
         if container.name not in self.__container_stats_streams and container.status in self.STREAMING_STATUS:
             logging.debug(f"DockerDaemonClient - Starting streamer for {container.name}")
             streamer = ContainerStatStreamer(container, self.__streaming_event_loop)
+            streamer.start_stream()
             self.__container_stats_streams[container.name] = streamer
 
         elif container.name in self.__container_stats_streams and container.status not in self.STREAMING_STATUS:
