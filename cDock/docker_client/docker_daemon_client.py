@@ -6,9 +6,9 @@ from docker import DockerClient
 from docker.models.containers import Container
 
 from cDock.config import Config
-from cDock.docker_client.container_logs_streamer import ContainerLogsStreamer
-from cDock.docker_client.container_stat_streamer import ContainerStatStreamer
-from cDock.docker_client.models import ContainerView
+from cDock.docker_client.logs_streamer import LogsStreamer
+from cDock.docker_client.stats_streamer import StatsStreamer
+from cDock.models import ContainerView
 
 
 class DockerDaemonClient:
@@ -23,7 +23,7 @@ class DockerDaemonClient:
         self.__config = config
         self.__client: DockerClient = None
         self.__containers: Dict[str, Container] = {}
-        self.__container_stats_streams: Dict[str, ContainerStatStreamer] = {}
+        self.__container_stats_streams: Dict[str, StatsStreamer] = {}
 
         # For cleaning up executing container actions
         self.__container_action_map: Dict[str, Thread] = {}
@@ -57,8 +57,8 @@ class DockerDaemonClient:
     def __upsert_container(self, container: Container) -> None:
         """
         Adds the container to the internal maps. If already present, old entry is replaced. If the container's status is
-        in STREAMING_STATUS, a ContainerStatStreamer is created for the container, else any previously created
-        ContainerStatStreamer is stopped and removed.
+        in STREAMING_STATUS, a StatsStreamer is created for the container, else any previously created
+        StatsStreamer is stopped and removed.
 
         :param container:
         """
@@ -71,7 +71,7 @@ class DockerDaemonClient:
 
         if container_key not in self.__container_stats_streams and container.status in self.STREAMING_STATUS:
             logging.debug(f"DockerDaemonClient - Starting streamer for {container_key}")
-            self.__container_stats_streams[container_key] = ContainerStatStreamer(container)
+            self.__container_stats_streams[container_key] = StatsStreamer(container)
             self.__container_stats_streams[container_key].start_stream()
 
         elif container_key in self.__container_stats_streams and container.status not in self.STREAMING_STATUS:
@@ -80,7 +80,7 @@ class DockerDaemonClient:
 
     def __remove_container(self, container_key: str) -> None:
         """
-        Removes the corresponding container from the internal maps. If the container has a ContainerStatStreamer, it is
+        Removes the corresponding container from the internal maps. If the container has a StatsStreamer, it is
         stopped and removed.
 
         :param container_key: The container that needs to be removed
@@ -96,10 +96,10 @@ class DockerDaemonClient:
     def __get_active_container_stats(self, container: Container) -> Dict:
         """
         Returns a dict with the active stats of the container with the information from the corresponding
-        ContainerStatStreamer. Returns a empty dict if no ContainerStatStreamer exists for the container.
+        StatsStreamer. Returns a empty dict if no StatsStreamer exists for the container.
 
         :param container: The Container to get active stats for.
-        :return: A dict with active stats if a ContainerStatStreamer exists for the container
+        :return: A dict with active stats if a StatsStreamer exists for the container
         """
         stats = {}
         container_key = self.__get_key(container)
@@ -221,4 +221,4 @@ class DockerDaemonClient:
     def logs(self, container_key: str):
         if container_key not in self.__containers:
             raise Exception('Unknown container!')
-        return ContainerLogsStreamer(self.__containers[container_key])
+        return LogsStreamer(self.__containers[container_key])

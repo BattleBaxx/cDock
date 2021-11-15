@@ -1,9 +1,9 @@
 from docker.models.containers import Container
 
-from cDock.docker_client.container_info_streamer import ContainerInfoStreamer
+from cDock.docker_client.info_streamer import InfoStreamer
 
 
-class ContainerLogsStreamer(ContainerInfoStreamer):
+class LogsStreamer(InfoStreamer):
 
     def __init__(self, container: Container):
         super().__init__(container, sleep_interval=0)

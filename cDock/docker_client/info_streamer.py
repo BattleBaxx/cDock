@@ -18,7 +18,7 @@ def run_event_loop(event_loop: asyncio.AbstractEventLoop) -> None:
     event_loop.run_forever()
 
 
-class ContainerInfoStreamer(ABC):
+class InfoStreamer(ABC):
     __executor = concurrent.futures.ThreadPoolExecutor()
     __event_loop: asyncio.AbstractEventLoop = asyncio.new_event_loop()
     __event_loop_thread: Thread = Thread(target=run_event_loop, args=(__event_loop,))
