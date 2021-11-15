@@ -162,6 +162,11 @@ class DockerDaemonClient:
 
         return True
 
+    def disconnect(self):
+        self.__client.close()
+        for key in self.__containers.keys():
+            self.__remove_container(key)
+
     def get_version_and_container_views(self) -> Optional[Dict]:
         """
         Returns a dict with `version` and  `container_views` as keys (latter is not included if a error occurs)
