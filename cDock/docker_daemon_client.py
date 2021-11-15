@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from threading import Thread
 from typing import Dict, Optional
@@ -7,6 +6,7 @@ from docker import DockerClient
 from docker.models.containers import Container
 
 from cDock.config import Config
+from cDock.container_logs_streamer import ContainerLogsStreamer
 from cDock.container_stat_streamer import ContainerStatStreamer
 from cDock.models import ContainerView
 
@@ -28,31 +28,28 @@ class DockerDaemonClient:
         # For cleaning up executing container actions
         self.__container_action_map: Dict[str, Thread] = {}
 
-    async def __clean_container_action_threads(self):
-        """
-        Async task that cleans up container action_executor threads when they get completed
-        """
-        while True:
-            for key, thread in self.__container_action_map.items():
-                if not thread.is_alive():
-                    self.__container_action_map.pop(key)
-            await asyncio.sleep(0.3)
+    def __action_executor(self, key: str, action, args, kwargs):
+        try:
+            action(*args, **kwargs)
+        except Exception as e:
+            logging.info(f"DockerDaemonClient - Exception during action for {key} : ({e})")
+        finally:
+            self.__container_action_map.pop(key)
 
-    def __container_action(self, container_name: str, action: str, *args, **kwargs):
+    def __container_action(self, container_name: str, action_name: str, *args, **kwargs):
         if container_name not in self.__containers:
             raise Exception('Unknown container!')
-        if not hasattr(self.__containers[container_name], action):
+        if not hasattr(self.__containers[container_name], action_name):
             raise Exception('Unknown action_executor!')
 
-        key = f"{container_name}/{action}"
+        key = f"{container_name}/{action_name}"
         if key in self.__container_action_map:
             raise Exception('Another action_executor in progress!')
 
-        action_executor = getattr(self.__containers[container_name], action)
-        thread = Thread(target=action_executor, args=args, kwargs=kwargs)
-        thread.daemon = True
-        thread.start()
-        self.__container_action_map[key] = thread
+        action = getattr(self.__containers[container_name], action_name)
+        self.__container_action_map[key] = Thread(target=self.__action_executor, args=(key, action, args, kwargs))
+        self.__container_action_map[key].daemon = True
+        self.__container_action_map[key].start()
 
     def __upsert_container(self, container: Container) -> None:
         """
@@ -215,3 +212,8 @@ class DockerDaemonClient:
 
     def kill(self, container_name: str):
         self.__container_action(container_name, 'kill')
+
+    def logs(self, container_name: str):
+        if container_name not in self.__containers:
+            raise Exception('Unknown container!')
+        return ContainerLogsStreamer(self.__containers[container_name])
