@@ -7,6 +7,7 @@ import sys
 import termios
 import threading
 import time
+from datetime import datetime
 import pydevd_pycharm
 from ascii_graph import Pyasciigraph
 from rich import box
@@ -55,6 +56,29 @@ def get_formatted_memory(value):
         i += 1
     return str(format(value, '.2f')) + " " + suffixs[i]
 
+def get_formatted_datetime(value):
+    units = ["days", "hours", "minutes", "seconds"]
+
+    duration_list = []
+    total_seconds = value.total_seconds()
+
+    duration_list.append(value.days)
+
+    days = divmod(total_seconds, 86400)
+    hours = divmod(days[1], 3600)
+    minutes = divmod(hours[1], 60)
+    seconds = divmod(minutes[1], 1)
+
+    duration_list.append(int(hours[0]))
+    duration_list.append(int(minutes[0]))
+    duration_list.append(int(seconds[0]))
+
+    non_zero_index = duration_list.index(next(filter(lambda x: x!=0, duration_list)))
+
+    if non_zero_index == len(units)-1:
+        return f"{duration_list[non_zero_index]} seconds ago."
+
+    return f"{duration_list[non_zero_index]} {units[non_zero_index]}, {duration_list[non_zero_index+1]} {units[non_zero_index+1]} ago."
 
 class RichScreen:
     def __init__(self):
@@ -167,8 +191,8 @@ class RichScreen:
             attr = ui_to_container_view[attr].split(".")
             if len(attr) == 1:
                 value = getattr(view, attr[0])
-                if attr[0] == "updated_at" or attr[0] == "created_at":
-                    self.logger.info(f"Datetime is {value}")
+                if attr[0] == "started_at" or attr[0] == "created_at":
+                    value = get_formatted_datetime(datetime.now()-value.replace(tzinfo=None))
             else:
                 if getattr(view, attr[0]) == None:
                     value = "_"
