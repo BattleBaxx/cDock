@@ -25,28 +25,8 @@ class DockerDaemonClient:
         self.__containers: Dict[str, Container] = {}
         self.__container_stats_streams: Dict[str, ContainerStatStreamer] = {}
 
-        # For streaming container stats in a background thread
-        self.__streaming_event_loop = asyncio.new_event_loop()
-        self.__streaming_event_loop_thread = Thread(target=self.__run_streaming_event_loop)
-        self.__streaming_event_loop_thread.daemon = True
-
         # For cleaning up executing container actions
         self.__container_action_map: Dict[str, Thread] = {}
-        asyncio.run_coroutine_threadsafe(self.__clean_container_action_threads(), self.__streaming_event_loop)
-
-    def __run_streaming_event_loop(self) -> None:
-        """
-        A utility method used to run the event loop for stats streaming in a background thread.
-        """
-        asyncio.set_event_loop(self.__streaming_event_loop)
-        self.__streaming_event_loop.run_forever()
-
-    def __start_streaming_event_loop_thread(self) -> None:
-        """
-        Starts the background event loop thread if its not started yet. Returns if its already started
-        """
-        if not self.__streaming_event_loop_thread.is_alive():
-            self.__streaming_event_loop_thread.start()
 
     async def __clean_container_action_threads(self):
         """
@@ -90,9 +70,8 @@ class DockerDaemonClient:
 
         if container.name not in self.__container_stats_streams and container.status in self.STREAMING_STATUS:
             logging.debug(f"DockerDaemonClient - Starting streamer for {container.name}")
-            streamer = ContainerStatStreamer(container, self.__streaming_event_loop)
-            streamer.start_stream()
-            self.__container_stats_streams[container.name] = streamer
+            self.__container_stats_streams[container.name] = ContainerStatStreamer(container)
+            self.__container_stats_streams[container.name].start_stream()
 
         elif container.name in self.__container_stats_streams and container.status not in self.STREAMING_STATUS:
             logging.debug(f"DockerDaemonClient - Stopping streamer for {container.name}")
@@ -181,7 +160,6 @@ class DockerDaemonClient:
             logging.error(f"DockerDaemonClient - Failed establish connection to docker daemon ({e})")
             return False
 
-        self.__start_streaming_event_loop_thread()
         return True
 
     def get_version_and_container_views(self) -> Optional[Dict]:

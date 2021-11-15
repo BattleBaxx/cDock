@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from datetime import datetime
 from typing import Dict, Optional
@@ -25,8 +24,8 @@ def read_iso_timestamp(timestamp_str: str) -> datetime:
 
 class ContainerStatStreamer(ContainerInfoStreamer):
 
-    def __init__(self, container: Container, loop: asyncio.AbstractEventLoop):
-        super().__init__(container, loop)
+    def __init__(self, container: Container):
+        super().__init__(container)
         self.stats: Dict = {}
 
         # To calculate with details from Docker API
