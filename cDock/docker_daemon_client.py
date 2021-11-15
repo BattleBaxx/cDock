@@ -28,6 +28,9 @@ class DockerDaemonClient:
         # For cleaning up executing container actions
         self.__container_action_map: Dict[str, Thread] = {}
 
+    def __get_key(self, container: Container) -> str:
+        return container.name
+
     def __action_executor(self, key: str, action, args, kwargs):
         try:
             action(*args, **kwargs)
@@ -36,17 +39,17 @@ class DockerDaemonClient:
         finally:
             self.__container_action_map.pop(key)
 
-    def __container_action(self, container_name: str, action_name: str, *args, **kwargs):
-        if container_name not in self.__containers:
+    def __container_action(self, container_key: str, action_name: str, *args, **kwargs):
+        if container_key not in self.__containers:
             raise Exception('Unknown container!')
-        if not hasattr(self.__containers[container_name], action_name):
+        if not hasattr(self.__containers[container_key], action_name):
             raise Exception('Unknown action_executor!')
 
-        key = f"{container_name}/{action_name}"
+        key = f"{container_key}/{action_name}"
         if key in self.__container_action_map:
             raise Exception('Another action_executor in progress!')
 
-        action = getattr(self.__containers[container_name], action_name)
+        action = getattr(self.__containers[container_key], action_name)
         self.__container_action_map[key] = Thread(target=self.__action_executor, args=(key, action, args, kwargs))
         self.__container_action_map[key].daemon = True
         self.__container_action_map[key].start()
@@ -59,35 +62,36 @@ class DockerDaemonClient:
 
         :param container:
         """
-        if container.name not in self.__containers:
-            logging.info(f"DockerDaemonClient - Adding container {container.name}")
+        container_key = self.__get_key(container)
+        if container_key not in self.__containers:
+            logging.info(f"DockerDaemonClient - Adding container {container_key}")
         else:
-            logging.debug(f"DockerDaemonClient - Updating container {container.name}")
-        self.__containers[container.name] = container
+            logging.debug(f"DockerDaemonClient - Updating container {container_key}")
+        self.__containers[container_key] = container
 
-        if container.name not in self.__container_stats_streams and container.status in self.STREAMING_STATUS:
-            logging.debug(f"DockerDaemonClient - Starting streamer for {container.name}")
-            self.__container_stats_streams[container.name] = ContainerStatStreamer(container)
-            self.__container_stats_streams[container.name].start_stream()
+        if container_key not in self.__container_stats_streams and container.status in self.STREAMING_STATUS:
+            logging.debug(f"DockerDaemonClient - Starting streamer for {container_key}")
+            self.__container_stats_streams[container_key] = ContainerStatStreamer(container)
+            self.__container_stats_streams[container_key].start_stream()
 
-        elif container.name in self.__container_stats_streams and container.status not in self.STREAMING_STATUS:
-            logging.debug(f"DockerDaemonClient - Stopping streamer for {container.name}")
-            self.__container_stats_streams.pop(container.name).stop_stream()
+        elif container_key in self.__container_stats_streams and container.status not in self.STREAMING_STATUS:
+            logging.debug(f"DockerDaemonClient - Stopping streamer for {container_key}")
+            self.__container_stats_streams.pop(container_key).stop_stream()
 
-    def __remove_container(self, container_name: str) -> None:
+    def __remove_container(self, container_key: str) -> None:
         """
         Removes the corresponding container from the internal maps. If the container has a ContainerStatStreamer, it is
         stopped and removed.
 
-        :param container_name: The container that needs to be removed
+        :param container_key: The container that needs to be removed
         """
-        if container_name in self.__containers:
-            logging.info(f"DockerDaemonClient - Removing container {container_name}")
-            self.__containers[container_name] = container_name
+        if container_key in self.__containers:
+            logging.info(f"DockerDaemonClient - Removing container {container_key}")
+            self.__containers[container_key] = container_key
 
-        if container_name in self.__container_stats_streams:
-            logging.debug(f"DockerDaemonClient - Stopping streamer for {container_name}")
-            self.__container_stats_streams.pop(container_name).stop_stream()
+        if container_key in self.__container_stats_streams:
+            logging.debug(f"DockerDaemonClient - Stopping streamer for {container_key}")
+            self.__container_stats_streams.pop(container_key).stop_stream()
 
     def __get_active_container_stats(self, container: Container) -> Dict:
         """
@@ -98,6 +102,7 @@ class DockerDaemonClient:
         :return: A dict with active stats if a ContainerStatStreamer exists for the container
         """
         stats = {}
+        container_key = self.__get_key(container)
 
         try:
             stats['started_at'] = container.attrs['State']['StartedAt']
@@ -107,13 +112,13 @@ class DockerDaemonClient:
             if container.attrs['Config'].get('Cmd', None):
                 stats['command'].extend(container.attrs['Config'].get('Cmd', []))
 
-            stats['cpu_stats'] = self.__container_stats_streams[container.name].get_cpu_stats()
-            stats['memory_stats'] = self.__container_stats_streams[container.name].get_memory_stats()
-            stats['net_io_stats'] = self.__container_stats_streams[container.name].get_network_io()
-            stats['disk_io_stats'] = self.__container_stats_streams[container.name].get_disk_io()
+            stats['cpu_stats'] = self.__container_stats_streams[container_key].get_cpu_stats()
+            stats['memory_stats'] = self.__container_stats_streams[container_key].get_memory_stats()
+            stats['net_io_stats'] = self.__container_stats_streams[container_key].get_network_io()
+            stats['disk_io_stats'] = self.__container_stats_streams[container_key].get_disk_io()
             stats['ports'] = container.attrs['Config'].get('ExposedPorts', [])
         except Exception as e:
-            logging.error(f"DockerDaemonClient - Failed getting active stats for {container.name} ({e})")
+            logging.error(f"DockerDaemonClient - Failed getting active stats for {container_key} ({e})")
             logging.error(container)
 
         return stats
@@ -195,25 +200,25 @@ class DockerDaemonClient:
 
         return stats
 
-    def start(self, container_name: str):
-        self.__container_action(container_name, 'start')
+    def start(self, container_key: str):
+        self.__container_action(container_key, 'start')
 
-    def restart(self, container_name: str):
-        self.__container_action(container_name, 'restart')
+    def restart(self, container_key: str):
+        self.__container_action(container_key, 'restart')
 
-    def pause(self, container_name: str):
-        self.__container_action(container_name, 'pause')
+    def pause(self, container_key: str):
+        self.__container_action(container_key, 'pause')
 
-    def resume(self, container_name: str):
-        self.__container_action(container_name, 'resume')
+    def resume(self, container_key: str):
+        self.__container_action(container_key, 'resume')
 
-    def stop(self, container_name: str):
-        self.__container_action(container_name, 'stop')
+    def stop(self, container_key: str):
+        self.__container_action(container_key, 'stop')
 
-    def kill(self, container_name: str):
-        self.__container_action(container_name, 'kill')
+    def kill(self, container_key: str):
+        self.__container_action(container_key, 'kill')
 
-    def logs(self, container_name: str):
-        if container_name not in self.__containers:
+    def logs(self, container_key: str):
+        if container_key not in self.__containers:
             raise Exception('Unknown container!')
-        return ContainerLogsStreamer(self.__containers[container_name])
+        return ContainerLogsStreamer(self.__containers[container_key])
