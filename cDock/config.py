@@ -5,7 +5,8 @@ from dotenv import load_dotenv
 
 class Config:
     def __init__(self, docker_socket_url, docker_cert_path, docker_tls_verify_path, docker_config_path,
-                 client_list_all_containers, tui_header_color, priority_attributes):
+                 client_list_all_containers, tui_header_color, default_style, selected_row_style, selected_col_style,
+                 priority_attributes):
         # Docker daemon options
         self.docker_socket_url = docker_socket_url
         self.docker_cert_path = docker_cert_path
@@ -17,6 +18,9 @@ class Config:
 
         # TUI options
         self.tui_header_color = tui_header_color
+        self.default_style = default_style
+        self.selected_row_style = selected_row_style
+        self.selected_col_style = selected_col_style
         self.priority_attributes = priority_attributes
 
     @staticmethod
@@ -38,7 +42,10 @@ class Config:
 
             # TUI options
             'tui_header_color': os.getenv("TUI_HEADER_COLOR"),
-            'priority_attributes':os.getenv("PRIORITY_ATTRIBUTES")
+            'default_style': os.getenv("DEFAULT_STYLE"),
+            'selected_row_style': os.getenv("SELECTED_ROW_STYLE"),
+            'selected_col_style': os.getenv("SELECTED_COL_STYLE"),
+            'priority_attributes': os.getenv("PRIORITY_ATTRIBUTES")
         }
 
         return Config(**config)
