@@ -45,7 +45,7 @@ class Config:
             'default_style': os.getenv("DEFAULT_STYLE"),
             'selected_row_style': os.getenv("SELECTED_ROW_STYLE"),
             'selected_col_style': os.getenv("SELECTED_COL_STYLE"),
-            'priority_attributes': os.getenv("PRIORITY_ATTRIBUTES")
+            'priority_attributes': os.getenv("PRIORITY_ATTRIBUTES", "name,status,cpu,mem_usage,ior/s,iow/s,rx/s,tx/s")
         }
 
         return Config(**config)

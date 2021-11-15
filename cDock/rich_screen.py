@@ -8,7 +8,7 @@ import termios
 import threading
 import time
 from datetime import datetime
-import pydevd_pycharm
+
 from ascii_graph import Pyasciigraph
 from rich import box
 from rich.layout import Layout
@@ -17,10 +17,10 @@ from rich.table import Table
 # from rich.style import Style
 from rich.text import Text
 
-from cDock.models import ContainerView
-from cDock.console import console
 from cDock.config import Config
+from cDock.console import console
 from cDock.docker_daemon_client import DockerDaemonClient
+from cDock.models import ContainerView
 
 # console = Console()
 # char = None
@@ -56,6 +56,7 @@ def get_formatted_memory(value):
         i += 1
     return str(format(value, '.2f')) + " " + suffixs[i]
 
+
 def get_formatted_datetime(value):
     units = ["days", "hours", "minutes", "seconds"]
 
@@ -73,12 +74,13 @@ def get_formatted_datetime(value):
     duration_list.append(int(minutes[0]))
     duration_list.append(int(seconds[0]))
 
-    non_zero_index = duration_list.index(next(filter(lambda x: x!=0, duration_list)))
+    non_zero_index = duration_list.index(next(filter(lambda x: x != 0, duration_list)))
 
-    if non_zero_index == len(units)-1:
+    if non_zero_index == len(units) - 1:
         return f"{duration_list[non_zero_index]} seconds ago."
 
-    return f"{duration_list[non_zero_index]} {units[non_zero_index]}, {duration_list[non_zero_index+1]} {units[non_zero_index+1]} ago."
+    return f"{duration_list[non_zero_index]} {units[non_zero_index]}, {duration_list[non_zero_index + 1]} {units[non_zero_index + 1]} ago."
+
 
 class RichScreen:
     def __init__(self):
@@ -192,7 +194,7 @@ class RichScreen:
             if len(attr) == 1:
                 value = getattr(view, attr[0])
                 if attr[0] == "started_at" or attr[0] == "created_at":
-                    value = get_formatted_datetime(datetime.now()-value.replace(tzinfo=None))
+                    value = get_formatted_datetime(datetime.now() - value.replace(tzinfo=None))
             else:
                 if getattr(view, attr[0]) is None:
                     value = "_"
