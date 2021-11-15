@@ -169,9 +169,9 @@ class RichScreen:
         for attr in rendering_attributes:
             table.add_column(attr)
         for index, view in enumerate(stats):
-            style = 'white'
+            style = self.config.default_style
             if index == self.row:
-                style = "cyan"
+                style = self.config.selected_row_style
             table.add_row(*self.generate_row(view, index), style=style)
         return table
 
@@ -187,14 +187,14 @@ class RichScreen:
             text = Text()
             style = ""
             if count == self.column and index == self.row:
-                style = "green bold"
+                style = self.config.selected_col_style
             attr = ui_to_container_view[attr].split(".")
             if len(attr) == 1:
                 value = getattr(view, attr[0])
                 if attr[0] == "started_at" or attr[0] == "created_at":
                     value = get_formatted_datetime(datetime.now()-value.replace(tzinfo=None))
             else:
-                if getattr(view, attr[0]) == None:
+                if getattr(view, attr[0]) is None:
                     value = "_"
                 else:
                     if attr[0] == "cpu_stats":
