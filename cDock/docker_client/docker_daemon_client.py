@@ -6,9 +6,9 @@ from docker import DockerClient
 from docker.models.containers import Container
 
 from cDock.config import Config
-from cDock.container_logs_streamer import ContainerLogsStreamer
-from cDock.container_stat_streamer import ContainerStatStreamer
-from cDock.models import ContainerView
+from cDock.docker_client.container_logs_streamer import ContainerLogsStreamer
+from cDock.docker_client.container_stat_streamer import ContainerStatStreamer
+from cDock.docker_client.models import ContainerView
 
 
 class DockerDaemonClient:

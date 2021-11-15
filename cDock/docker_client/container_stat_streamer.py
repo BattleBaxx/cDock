@@ -4,8 +4,8 @@ from typing import Dict, Optional
 
 from docker.models.containers import Container
 
-from cDock.container_info_streamer import ContainerInfoStreamer
-from cDock.models import DiskIOStats, NetIOStats, MemoryStats, CPUStats
+from cDock.docker_client.container_info_streamer import ContainerInfoStreamer
+from cDock.docker_client.models import DiskIOStats, NetIOStats, MemoryStats, CPUStats
 
 SHA_256_HASH_PICK = 12
 

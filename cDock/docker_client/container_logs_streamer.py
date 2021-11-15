@@ -1,6 +1,6 @@
 from docker.models.containers import Container
 
-from cDock.container_info_streamer import ContainerInfoStreamer
+from cDock.docker_client.container_info_streamer import ContainerInfoStreamer
 
 
 class ContainerLogsStreamer(ContainerInfoStreamer):
