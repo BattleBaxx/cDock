@@ -37,19 +37,52 @@ ui_to_container_view = {
     "command": "command"
 }
 
+def auto_unit(number, low_precision=False, min_symbol='K'):
+    """Make a nice human-readable string out of number.
+    Number of decimal places increases as quantity approaches 1.
+    CASE: 613421788        RESULT:       585M low_precision:       585M
+    CASE: 5307033647       RESULT:      4.94G low_precision:       4.9G
+    CASE: 44968414685      RESULT:      41.9G low_precision:      41.9G
+    CASE: 838471403472     RESULT:       781G low_precision:       781G
+    CASE: 9683209690677    RESULT:      8.81T low_precision:       8.8T
+    CASE: 1073741824       RESULT:      1024M low_precision:      1024M
+    CASE: 1181116006       RESULT:      1.10G low_precision:       1.1G
+    :low_precision: returns less decimal places potentially (default is False)
+                    sacrificing precision for more readability.
+    :min_symbol: Do not approache if number < min_symbol (default is K)
+    """
+    symbols = ('K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y')
+    if min_symbol in symbols:
+        symbols = symbols[symbols.index(min_symbol):]
+    prefix = {
+        'Y': 1208925819614629174706176,
+        'Z': 1180591620717411303424,
+        'E': 1152921504606846976,
+        'P': 1125899906842624,
+        'T': 1099511627776,
+        'G': 1073741824,
+        'M': 1048576,
+        'K': 1024
+    }
 
-def get_formatted_memory(value):
-    suffixs = ["", "KB", "MB", "GB", "TB"]
-    denominator = 1024
-    i = 0
-    while i <= 4:
-        if value / 1024 > 1:
-            denominator *= 1024
-            value /= 1024
-        else:
-            break
-        i += 1
-    return str(format(value, '.2f')) + " " + suffixs[i]
+    for symbol in reversed(symbols):
+        value = float(number) / prefix[symbol]
+        if value > 1:
+            decimal_precision = 0
+            if value < 10:
+                decimal_precision = 2
+            elif value < 100:
+                decimal_precision = 1
+            if low_precision:
+                if symbol in 'MK':
+                    decimal_precision = 0
+                else:
+                    decimal_precision = min(1, decimal_precision)
+            elif symbol in 'K':
+                decimal_precision = 0
+            return '{:.{decimal}f}{symbol}'.format(
+                value, decimal=decimal_precision, symbol=symbol)
+    return '{!s}'.format(number)
 
 
 def get_formatted_datetime(value):
@@ -74,7 +107,7 @@ def get_formatted_datetime(value):
     if non_zero_index == len(units) - 1:
         return f"{duration_list[non_zero_index]} seconds ago."
 
-    return f"{duration_list[non_zero_index]} {units[non_zero_index]}, {duration_list[non_zero_index + 1]} {units[non_zero_index + 1]} ago."
+    return f"{duration_list[non_zero_index]} {units[non_zero_index]} ago."
 
 
 class RichScreen:
@@ -85,7 +118,7 @@ class RichScreen:
         self.column = 0
         self.refresh_layout = True
         self.layout = None
-        self.single_container_view = True
+        self.single_container_view = False
         self.console = Console()
 
         self.logger = logging.getLogger(__name__)
@@ -164,13 +197,14 @@ class RichScreen:
         for attr in rendering_attributes:
             text = Text()
             style = ""
-            if count == self.column and index == self.row:
-                style = self.config.selected_col_style
             attr = ui_to_container_view[attr].split(".")
             if len(attr) == 1:
                 value = getattr(view, attr[0])
                 if attr[0] == "started_at" or attr[0] == "created_at":
-                    value = get_formatted_datetime(datetime.now() - value.replace(tzinfo=None))
+                    if value is None:
+                        value = "-"
+                    else:
+                        value = get_formatted_datetime(datetime.now() - value.replace(tzinfo=None))
             else:
                 if getattr(view, attr[0]) is None:
                     value = "_"
@@ -178,9 +212,25 @@ class RichScreen:
                     if attr[0] == "cpu_stats":
                         value = format(getattr(getattr(view, attr[0]), attr[1]), '.2f')
                     elif attr[0] == "memory_stats":
-                        value = get_formatted_memory(getattr(getattr(view, attr[0]), attr[1]))
+                        value = auto_unit(getattr(getattr(view, attr[0]), attr[1]))
                     else:
                         value = getattr(getattr(view, attr[0]), attr[1])
+
+            if value == "created":
+                style = self.config.container_created_style
+            elif value == "restarting":
+                style = self.config.container_restarting_style
+            elif value == "running":
+                style = self.config.container_running_style
+            elif value == "paused":
+                style = self.config.container_paused_style
+            elif value == "exited":
+                style = self.config.container_exited_style
+            elif value == "dead":
+                style = self.config.container_dead_style
+
+            if count == self.column and index == self.row:
+                style = self.config.selected_col_style
             text.append(str(value), style=style)
             renderables_list.append(text)
             count += 1
