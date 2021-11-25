@@ -135,7 +135,7 @@ class DockerDaemonClient:
             'name': container.name,
             'id': container.id,
             'status': container.attrs['State']['Status'],
-            'image': str(container.image.tags),
+            'image': container.image.tags[0] if len(container.image.tags) > 0 else "",
             'created_at': container.attrs['Created'],
         }
         if view['status'] in self.STREAMING_STATUS:
