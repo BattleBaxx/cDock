@@ -212,7 +212,7 @@ class DockerDaemonClient:
         self.__container_action(container_key, 'pause')
 
     def resume(self, container_key: str):
-        self.__container_action(container_key, 'resume')
+        self.__container_action(container_key, 'unpause')
 
     def stop(self, container_key: str):
         self.__container_action(container_key, 'stop')
