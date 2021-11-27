@@ -26,7 +26,7 @@ class cDockStandalone:
 
         self.container_views: List[ContainerView] = []
 
-        self.running = True
+        self.is_running = True
         self.key_press_listener_thread = Thread(target=self.key_strokes_listener, args=())
 
     def run(self):
@@ -36,7 +36,7 @@ class cDockStandalone:
         self.screen.init_screen()
         self.key_press_listener_thread.start()
 
-        while self.running:
+        while self.is_running:
             try:
                 if self._changed or self.is_after_refresh_window():
                     if self.is_after_refresh_window():
@@ -44,11 +44,10 @@ class cDockStandalone:
 
                     self.screen.render()
             except KeyboardInterrupt:
-                self.running = False
-                exit()
+                self.shutdown()
             except Exception as e:
-                with open("err") as f:
-                    f.write(e)
+                self.shutdown()
+                raise e
 
     def is_after_refresh_window(self):
         return time.time() - self.last_stats_update_timestamp > self.DEFAULT_REFRESH_TIME
@@ -82,7 +81,7 @@ class cDockStandalone:
         fcntl.fcntl(fd, fcntl.F_SETFL, oldflags | os.O_NONBLOCK)
 
         try:
-            while self.running:
+            while self.is_running:
                 try:
                     char = sys.stdin.read(1)
                     if not char:
@@ -132,7 +131,7 @@ class cDockStandalone:
             print(e)
 
     def shutdown(self):
-        self.running = False
-        self.screen.stop()
-        self.client.disconnect()
-        exit()
+        if self.is_running:
+            self.is_running = False
+            self.screen.stop()
+            self.client.disconnect()

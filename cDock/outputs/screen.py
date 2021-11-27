@@ -18,7 +18,7 @@ class cDockRichScreen:
         self.container_table = Table()
         self.formatter = RichFormatter(config)
 
-        self.live = Live(console=self.console)
+        self.live = Live(console=self.console, screen=True)
 
     def init_screen(self):
         self.live.start(False)
@@ -45,7 +45,7 @@ class cDockRichScreen:
             "w": "Up     ",
             "s": "Down   ",
             "1": "Start  ",
-            "2": "Down   ",
+            "2": "Stop   ",
             "3": "Restart",
             "4": "Kill   ",
             "5": "Pause  ",
