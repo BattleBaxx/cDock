@@ -31,7 +31,7 @@ class Config:
         self.priority_attributes = priority_attributes
 
     @staticmethod
-    def load_env_from_file(path: str):
+    def load_env_from_file(path: str = None):
         if path:
             load_dotenv(path)
         else:
