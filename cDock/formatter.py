@@ -37,7 +37,7 @@ class RichFormatter:
         values = {
             "name": view.name,
             "id": view.id[:SHA_512_ID_PICK_SIZE],
-            "status": view.status,
+            "status": self._format_container_status(view.status),
             "image": view.image,
             "cpu": format(view.cpu_stats.usage, ".2f") if view.cpu_stats else '-',
             "mem_usage": self._auto_unit(view.memory_stats.usage) if view.memory_stats else '-',
@@ -51,7 +51,7 @@ class RichFormatter:
             "ports": ", ".join(view.published_ports),
             "command": view.command[0] if len(view.command) > 0 else '',
         }
-        return [Text(values[attr], overflow="ellipsis") for attr in self.config.priority_attributes.split(',')]
+        return [values[attr] for attr in self.config.priority_attributes.split(',')]
 
     def _format_cpu_usage(self, stats: CPUStats) -> str:
         return format(stats.usage, ".2f") if stats else '_'
@@ -85,13 +85,17 @@ class RichFormatter:
 
         return '{!s}'.format(number)
 
-    def _get_container_status_style(self, status):
+    def _format_container_status(self, status) -> Text:
         status_styles = {
-            "created": self.config.container_created_style,
-            "restarting": self.config.container_created_style,
-            "running": self.config.container_created_style,
-            "paused": self.config.container_created_style,
-            "exited": self.config.container_created_style,
-            "dead": self.config.container_created_style,
+            "created": ("🌱", self.config.container_created_style),
+            "restarting": ("⟳", self.config.container_restarting_style),
+            "running": ("🟢", self.config.container_running_style),
+            "paused": ("⏸ ", self.config.container_paused_style),
+            "exited": ("❌", self.config.container_exited_style),
+            "dead": ("💀", self.config.container_dead_style),
         }
-        return status_styles.get(status, '')
+        style = ''
+        if status in status_styles:
+            style = status_styles[status][1]
+            status = f"{status_styles[status][0]} {status}"
+        return Text(status, style=style)
