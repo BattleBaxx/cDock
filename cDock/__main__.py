@@ -1,4 +1,4 @@
-from cDock.user_interface.rich_screen import RichScreen
+from cDock.main import cDockStandalone
 
-if __name__ == "__main__":
-    RichScreen().render()
+if __name__ == '__main__':
+    cDockStandalone().run()

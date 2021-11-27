@@ -31,7 +31,7 @@ class DiskIOStats(BaseModel):
     read_time: datetime
     ior: Optional[int]
     iow: Optional[int]
-    duration: Optional[timedelta]
+    duration: timedelta = timedelta(seconds=1)
 
 
 class ContainerView(BaseModel):
