@@ -29,11 +29,12 @@ class DockerDaemonClient:
         self.__container_action_map: Dict[str, Thread] = {}
 
     def __get_key(self, container: Container) -> str:
-        return container.name
+        return container.id
 
     def __action_executor(self, key: str, action, args, kwargs):
         try:
             action(*args, **kwargs)
+            logging.debug(f"DockerDaemonClient - Executed: ({key})")
         except Exception as e:
             logging.info(f"DockerDaemonClient - Exception during action for {key} : ({e})")
         finally:
@@ -116,7 +117,7 @@ class DockerDaemonClient:
             stats['memory_stats'] = self.__container_stats_streams[container_key].get_memory_stats()
             stats['net_io_stats'] = self.__container_stats_streams[container_key].get_network_io()
             stats['disk_io_stats'] = self.__container_stats_streams[container_key].get_disk_io()
-            stats['ports'] = container.attrs['Config'].get('ExposedPorts', [])
+            stats['published_ports'] = [k for k in container.attrs['Config'].get('ExposedPorts', {}).keys()]
         except Exception as e:
             logging.error(f"DockerDaemonClient - Failed getting active stats for {container_key} ({e})")
             logging.error(container)
@@ -191,9 +192,10 @@ class DockerDaemonClient:
         for container in containers:
             self.__upsert_container(container)
 
-        missing_container_names = set(self.__container_stats_streams.keys()) - set([c.name for c in containers])
-        for container_name in missing_container_names:
-            self.__remove_container(container_name)
+        missing_container_names = set(self.__container_stats_streams.keys()) - set(
+            [self.__get_key(c) for c in containers])
+        for container_key in missing_container_names:
+            self.__remove_container(container_key)
 
         # Generating ContainerView for all containers
         stats['container_views'] = [self.__generate_container_view(container) for container in containers]
