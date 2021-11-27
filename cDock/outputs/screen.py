@@ -6,7 +6,7 @@ from rich.table import Table
 from rich.text import Text
 
 from cDock.config import Config
-from cDock.formatter import RichFormatter
+from cDock.outputs.formatter import RichFormatter
 
 
 class cDockRichScreen:

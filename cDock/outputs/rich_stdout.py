@@ -9,7 +9,7 @@ from typing import List
 from cDock.config import Config
 from cDock.docker_client import DockerDaemonClient
 from cDock.models import ContainerView
-from cDock.screen import cDockRichScreen
+from cDock.outputs.screen import cDockRichScreen
 
 
 class cDockStandalone:

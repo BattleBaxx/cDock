@@ -45,7 +45,7 @@ class Config:
             'docker_config_path': os.getenv("DOCKER_CONFIG_PATH"),
 
             # Docker API Client options
-            'client_list_all_containers': os.getenv("DOCKER_API_LIST_ALL_CONTAINERS", False),
+            'client_list_all_containers': os.getenv("DOCKER_API_LIST_ALL_CONTAINERS", False) == "True",
 
             # TUI options
             'tui_header_color': os.getenv("TUI_HEADER_COLOR"),
